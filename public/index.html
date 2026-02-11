@@ -553,7 +553,7 @@
       main.appendChild(loading);
 
       try {
-        const res = await fetch('/api/file?path=' + encodeURIComponent(filePath));
+        const res = await fetch('api/file?path=' + encodeURIComponent(filePath));
         if (!res.ok) throw new Error('Failed to load');
         const data = await res.json();
         if (currentFilePath !== filePath) return;
@@ -679,13 +679,16 @@
       actions.className = 'pdf-actions';
 
       const downloadLink = document.createElement('a');
-      downloadLink.href = data.downloadUrl;
+      const pdfUrl = (data.downloadUrl && data.downloadUrl.startsWith('/api/'))
+        ? data.downloadUrl.slice(1)
+        : data.downloadUrl;
+      downloadLink.href = pdfUrl;
       downloadLink.download = data.path.split('/').pop();
       downloadLink.textContent = 'Download PDF';
       actions.appendChild(downloadLink);
 
       const openLink = document.createElement('a');
-      openLink.href = data.downloadUrl;
+      openLink.href = pdfUrl;
       openLink.target = '_blank';
       openLink.rel = 'noopener noreferrer';
       openLink.textContent = 'Open in new tab';
@@ -695,7 +698,7 @@
       // Embed PDF
       const embed = document.createElement('iframe');
       embed.className = 'pdf-embed';
-      embed.src = data.downloadUrl;
+      embed.src = pdfUrl;
       embed.title = data.path.split('/').pop();
       viewer.appendChild(embed);
 
@@ -727,7 +730,7 @@
       loadingDiv.textContent = 'Loading...';
       main.appendChild(loadingDiv);
 
-      const res = await fetch('/api/tree');
+      const res = await fetch('api/tree');
       treeData = await res.json();
       handleHash();
     }

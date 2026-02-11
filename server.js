@@ -9,12 +9,83 @@ import hljs from 'highlight.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || join(__dirname, '..');
 const PORT = 3500;
+const CRITICAL_ONLY = String(process.env.CRITICAL_ONLY || 'false').toLowerCase() === 'true';
+const SHOW_CONFIG_BACKUPS = String(process.env.SHOW_CONFIG_BACKUPS || 'false').toLowerCase() === 'true';
+
+// Curated OpenClaw paths that are operationally important.
+const CRITICAL_DIR_PREFIXES = [
+  'workspace',
+  'hooks',
+  'cron',
+  'subagents',
+  'logs',
+  'identity',
+  'devices',
+  'canvas',
+  'agents/main/agent',
+  'agents/main/qmd',
+  'agents/main/sessions',
+];
+
+const CRITICAL_ROOT_CONFIG_NAMES = ['openclaw.json', 'clawdbot.json'];
+
+function normalizeRelPath(relPath) {
+  return String(relPath || '')
+    .replace(/\\/g, '/')
+    .replace(/^\.?\//, '')
+    .replace(/\/+$/, '');
+}
+
+function isSameOrDescendant(path, prefix) {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+function isAncestor(path, prefix) {
+  return prefix === path || prefix.startsWith(`${path}/`);
+}
+
+function getRootConfigVisibility(filename) {
+  const lower = String(filename || '').toLowerCase();
+  for (const base of CRITICAL_ROOT_CONFIG_NAMES) {
+    if (lower === base) return { isPrimary: true, isBackup: false };
+    if (lower.startsWith(`${base}.`)) return { isPrimary: false, isBackup: true };
+  }
+  return { isPrimary: false, isBackup: false };
+}
+
+function shouldIncludePath(relPath, isDir, filename) {
+  if (!CRITICAL_ONLY) return true;
+
+  const p = normalizeRelPath(relPath);
+  if (!p) return true;
+
+  if (isDir) {
+    return CRITICAL_DIR_PREFIXES.some(
+      (prefix) => isAncestor(p, prefix) || isSameOrDescendant(p, prefix)
+    );
+  }
+
+  // Keep key root-level OpenClaw configs visible, backups optional.
+  if (!p.includes('/')) {
+    const cfg = getRootConfigVisibility(filename);
+    if (cfg.isPrimary) return true;
+    if (cfg.isBackup) return SHOW_CONFIG_BACKUPS;
+  }
+
+  const inCriticalDir = CRITICAL_DIR_PREFIXES.some((prefix) =>
+    isSameOrDescendant(p, prefix)
+  );
+  if (!inCriticalDir) return false;
+
+  return true;
+}
 
 // Supported file extensions by category
 const TEXT_EXTENSIONS = new Set([
   '.txt', '.js', '.ts', '.tsx', '.jsx', '.json', '.jsonl',
   '.yaml', '.yml', '.toml', '.sh', '.bash', '.css', '.html',
   '.xml', '.sql', '.py', '.env', '.gitignore', '.log', '.csv',
+  '.sqlite', '.sqlite-wal', '.sqlite-shm',
 ]);
 
 const IMAGE_EXTENSIONS = new Set([
@@ -43,6 +114,9 @@ const IMAGE_MIME = {
 };
 
 function getFileCategory(filename) {
+  const cfg = getRootConfigVisibility(filename);
+  if (cfg.isPrimary || cfg.isBackup) return 'text';
+
   const ext = extname(filename).toLowerCase();
   // Files without extension (like .gitignore, .env) — check full name
   if (!ext) {
@@ -84,7 +158,7 @@ async function buildTree(dir, rootDir) {
 
   // Sort: directories first, then files, both alphabetical
   const sorted = entries
-    .filter((e) => !e.name.startsWith('.') && e.name !== 'node_modules')
+    .filter((e) => e.name !== 'node_modules' && !(e.isDirectory() && e.name.startsWith('.')))
     .sort((a, b) => {
       if (a.isDirectory() && !b.isDirectory()) return -1;
       if (!a.isDirectory() && b.isDirectory()) return 1;
@@ -94,6 +168,7 @@ async function buildTree(dir, rootDir) {
   for (const entry of sorted) {
     const fullPath = join(dir, entry.name);
     const relPath = relative(rootDir, fullPath);
+    if (!shouldIncludePath(relPath, entry.isDirectory(), entry.name)) continue;
 
     if (entry.isDirectory()) {
       const children = await buildTree(fullPath, rootDir);
@@ -138,6 +213,9 @@ app.get('/api/file', async (req, res) => {
     }
 
     const filename = filePath.split('/').pop();
+    if (!shouldIncludePath(filePath, false, filename)) {
+      return res.status(403).json({ error: 'outside critical scope' });
+    }
     const category = getFileCategory(filename);
     if (!category) {
       return res.status(400).json({ error: 'unsupported file type' });
@@ -168,7 +246,7 @@ app.get('/api/file', async (req, res) => {
       res.json({ category: 'image', path: filePath, dataUrl: `data:${mime};base64,${base64}` });
 
     } else if (category === 'pdf') {
-      res.json({ category: 'pdf', path: filePath, downloadUrl: `/api/raw?path=${encodeURIComponent(filePath)}` });
+      res.json({ category: 'pdf', path: filePath, downloadUrl: `api/raw?path=${encodeURIComponent(filePath)}` });
     }
   } catch (err) {
     if (err.code === 'ENOENT') return res.status(404).json({ error: 'file not found' });
@@ -194,6 +272,9 @@ app.get('/api/raw', async (req, res) => {
     }
 
     const filename = filePath.split('/').pop();
+    if (!shouldIncludePath(filePath, false, filename)) {
+      return res.status(403).json({ error: 'outside critical scope' });
+    }
     const ext = extname(filename).toLowerCase();
     const category = getFileCategory(filename);
     if (!category) {
@@ -227,12 +308,14 @@ app.get('/api/search', async (req, res) => {
     async function search(dir) {
       const entries = await readdir(dir, { withFileTypes: true });
       for (const entry of entries) {
-        if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+        if (entry.name === 'node_modules') continue;
+        if (entry.isDirectory() && entry.name.startsWith('.')) continue;
         const fullPath = join(dir, entry.name);
+        const relPath = relative(WORKSPACE_ROOT, fullPath);
+        if (!shouldIncludePath(relPath, entry.isDirectory(), entry.name)) continue;
         if (entry.isDirectory()) {
           await search(fullPath);
         } else if (isSupported(entry.name)) {
-          const relPath = relative(WORKSPACE_ROOT, fullPath);
           if (relPath.toLowerCase().includes(query)) {
             const category = getFileCategory(entry.name);
             results.push({ path: relPath, category });
