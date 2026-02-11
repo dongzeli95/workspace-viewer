@@ -102,6 +102,15 @@
     .file-item .icon { color: var(--text-muted); flex-shrink: 0; font-size: 18px; }
     .file-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .file-item .count { color: var(--text-dim); font-size: 12px; }
+    .file-item .badge {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: var(--bg-hover);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
 
     /* Tree view */
     .tree-view {
@@ -162,6 +171,130 @@
     .markdown-body hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
     .markdown-body img { max-width: 100%; height: auto; border-radius: 6px; }
     .loading { text-align: center; padding: 40px; color: var(--text-dim); }
+
+    /* Code viewer with line numbers */
+    .code-viewer {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .code-header .lang-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+    }
+    .code-table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow-x: auto;
+      display: block;
+    }
+    .code-table td {
+      padding: 0;
+      border: none;
+      vertical-align: top;
+    }
+    .code-table .line-numbers {
+      width: 1px;
+      white-space: nowrap;
+      padding: 12px 0;
+      text-align: right;
+      user-select: none;
+      vertical-align: top;
+      color: var(--text-dim);
+      font-size: 13px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      line-height: 1.5;
+      border-right: 1px solid var(--border);
+    }
+    .code-table .line-numbers .line-num {
+      display: block;
+      padding: 0 12px;
+    }
+    .code-table .code-content {
+      padding: 12px 0;
+      overflow-x: auto;
+    }
+    .code-table .code-content pre {
+      margin: 0;
+      padding: 0 16px;
+      background: none;
+      border: none;
+      border-radius: 0;
+    }
+    .code-table .code-content pre code {
+      font-size: 13px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      line-height: 1.5;
+      background: none;
+      padding: 0;
+    }
+
+    /* Image viewer */
+    .image-viewer {
+      text-align: center;
+      padding: 20px 0;
+    }
+    .image-viewer img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+    }
+    .image-viewer .image-info {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    /* PDF viewer */
+    .pdf-viewer {
+      text-align: center;
+    }
+    .pdf-viewer .pdf-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .pdf-viewer .pdf-actions a {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      text-decoration: none;
+      color: #fff;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+    }
+    .pdf-viewer .pdf-actions a:hover {
+      opacity: 0.9;
+    }
+    .pdf-viewer .pdf-embed {
+      width: 100%;
+      height: 70vh;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-surface);
+    }
   </style>
 </head>
 <body>
@@ -185,6 +318,16 @@
     let viewMode = localStorage.getItem('viewMode') || 'list';
     let currentFilePath = null;
     let currentDirPath = [];
+
+    // File category icon mapping
+    const CATEGORY_ICONS = {
+      markdown: '\u{1F4C4}', text: '\u{1F4DD}', image: '\u{1F5BC}\uFE0F', pdf: '\u{1F4D5}', dir: '\u{1F4C1}',
+    };
+
+    function getFileIcon(item) {
+      if (item.type === 'dir') return CATEGORY_ICONS.dir;
+      return CATEGORY_ICONS[item.category] || '\u{1F4C4}';
+    }
 
     function sanitize(html) {
       return DOMPurify.sanitize(html, { ADD_TAGS: ['input'], ADD_ATTR: ['type', 'checked', 'disabled', 'class'] });
@@ -222,7 +365,7 @@
     function renderBreadcrumb(pathParts, isFile) {
       breadcrumbEl.textContent = '';
       const root = document.createElement('a');
-      root.textContent = '📁 workspace';
+      root.textContent = '\u{1F4C1} workspace';
       root.addEventListener('click', () => { currentFilePath = null; navigateHome(); });
       breadcrumbEl.appendChild(root);
 
@@ -262,6 +405,40 @@
       else renderTreeView();
     }
 
+    // Helper: build a file item row safely with DOM methods
+    function buildFileItemRow(item, pathParts) {
+      const row = document.createElement('div');
+      row.className = 'file-item';
+
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'icon';
+      iconSpan.textContent = getFileIcon(item);
+      row.appendChild(iconSpan);
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'name';
+      nameSpan.textContent = item.name;
+      row.appendChild(nameSpan);
+
+      if (item.type === 'dir') {
+        const countSpan = document.createElement('span');
+        countSpan.className = 'count';
+        countSpan.textContent = countFiles(item.children);
+        row.appendChild(countSpan);
+        row.addEventListener('click', () => { currentDirPath = [...pathParts, item.name]; renderFileList(currentDirPath); });
+      } else {
+        const ext = item.name.includes('.') ? item.name.split('.').pop() : '';
+        if (ext) {
+          const badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.textContent = ext;
+          row.appendChild(badge);
+        }
+        row.addEventListener('click', () => loadFile(item.path));
+      }
+      return row;
+    }
+
     // === LIST VIEW ===
     function renderFileList(pathParts) {
       currentDirPath = pathParts;
@@ -277,23 +454,21 @@
       if (pathParts.length > 0) {
         const back = document.createElement('div');
         back.className = 'file-item';
-        back.innerHTML = '<span class="icon">↩</span><span class="name" style="color:var(--text-muted)">..</span>';
+        const backIcon = document.createElement('span');
+        backIcon.className = 'icon';
+        backIcon.textContent = '\u21A9';
+        back.appendChild(backIcon);
+        const backName = document.createElement('span');
+        backName.className = 'name';
+        backName.style.color = 'var(--text-muted)';
+        backName.textContent = '..';
+        back.appendChild(backName);
         back.addEventListener('click', () => { currentDirPath = pathParts.slice(0, -1); renderFileList(currentDirPath); });
         list.appendChild(back);
       }
 
       for (const item of items) {
-        const row = document.createElement('div');
-        row.className = 'file-item';
-        if (item.type === 'dir') {
-          const count = countFiles(item.children);
-          row.innerHTML = `<span class="icon">📁</span><span class="name">${esc(item.name)}</span><span class="count">${count}</span>`;
-          row.addEventListener('click', () => { currentDirPath = [...pathParts, item.name]; renderFileList(currentDirPath); });
-        } else {
-          row.innerHTML = `<span class="icon">📄</span><span class="name">${esc(item.name)}</span>`;
-          row.addEventListener('click', () => loadFile(item.path));
-        }
-        list.appendChild(row);
+        list.appendChild(buildFileItemRow(item, pathParts));
       }
       main.appendChild(list);
       window.scrollTo(0, 0);
@@ -333,7 +508,7 @@
 
           const name = document.createElement('span');
           name.className = 'label-name';
-          name.textContent = '📁 ' + item.name;
+          name.textContent = '\u{1F4C1} ' + item.name;
           label.appendChild(name);
 
           const children = document.createElement('div');
@@ -355,7 +530,7 @@
 
           const name = document.createElement('span');
           name.className = 'label-name';
-          name.textContent = '📄 ' + item.name;
+          name.textContent = getFileIcon(item) + ' ' + item.name;
           label.appendChild(name);
 
           label.addEventListener('click', () => loadFile(item.path));
@@ -378,7 +553,7 @@
       main.appendChild(loading);
 
       try {
-        const res = await fetch(`/api/file?path=${encodeURIComponent(filePath)}`);
+        const res = await fetch('/api/file?path=' + encodeURIComponent(filePath));
         if (!res.ok) throw new Error('Failed to load');
         const data = await res.json();
         if (currentFilePath !== filePath) return;
@@ -386,12 +561,17 @@
         main.textContent = '';
         const content = document.createElement('div');
         content.className = 'content';
-        const article = document.createElement('article');
-        article.className = 'markdown-body';
-        const template = document.createElement('template');
-        template.innerHTML = sanitize(data.html);
-        article.appendChild(template.content);
-        content.appendChild(article);
+
+        if (data.category === 'markdown') {
+          renderMarkdown(content, data);
+        } else if (data.category === 'text') {
+          renderCode(content, data);
+        } else if (data.category === 'image') {
+          renderImage(content, data);
+        } else if (data.category === 'pdf') {
+          renderPdf(content, data);
+        }
+
         main.appendChild(content);
         window.scrollTo(0, 0);
         history.replaceState(null, '', '#' + filePath);
@@ -403,6 +583,123 @@
         errDiv.textContent = err.message;
         main.appendChild(errDiv);
       }
+    }
+
+    function renderMarkdown(container, data) {
+      const article = document.createElement('article');
+      article.className = 'markdown-body';
+      // Sanitize server-rendered markdown HTML via DOMPurify
+      const clean = sanitize(data.html);
+      const template = document.createElement('template');
+      template.innerHTML = clean;
+      article.appendChild(template.content);
+      container.appendChild(article);
+    }
+
+    function renderCode(container, data) {
+      const viewer = document.createElement('div');
+      viewer.className = 'code-viewer';
+
+      // Header with language badge
+      const header = document.createElement('div');
+      header.className = 'code-header';
+      const fileNameSpan = document.createElement('span');
+      fileNameSpan.textContent = data.path.split('/').pop();
+      header.appendChild(fileNameSpan);
+      const langBadge = document.createElement('span');
+      langBadge.className = 'lang-badge';
+      langBadge.textContent = data.lang;
+      header.appendChild(langBadge);
+      viewer.appendChild(header);
+
+      // Code table with line numbers
+      const lines = data.raw.split('\n');
+      // Remove trailing empty line from split
+      if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+
+      const table = document.createElement('table');
+      table.className = 'code-table';
+
+      const row = document.createElement('tr');
+
+      // Line numbers column
+      const lineNumTd = document.createElement('td');
+      lineNumTd.className = 'line-numbers';
+      for (let i = 1; i <= lines.length; i++) {
+        const span = document.createElement('span');
+        span.className = 'line-num';
+        span.textContent = i;
+        lineNumTd.appendChild(span);
+      }
+      row.appendChild(lineNumTd);
+
+      // Code content column — highlighted HTML is from server-side hljs (trusted)
+      const codeTd = document.createElement('td');
+      codeTd.className = 'code-content';
+      const pre = document.createElement('pre');
+      const code = document.createElement('code');
+      code.className = 'hljs language-' + data.lang;
+      // hljs output is trusted server-side syntax highlighting — sanitize for defense-in-depth
+      code.innerHTML = DOMPurify.sanitize(data.highlighted);
+      pre.appendChild(code);
+      codeTd.appendChild(pre);
+      row.appendChild(codeTd);
+
+      table.appendChild(row);
+      viewer.appendChild(table);
+      container.appendChild(viewer);
+    }
+
+    function renderImage(container, data) {
+      const viewer = document.createElement('div');
+      viewer.className = 'image-viewer';
+
+      const img = document.createElement('img');
+      img.src = data.dataUrl;
+      img.alt = data.path.split('/').pop();
+
+      const info = document.createElement('div');
+      info.className = 'image-info';
+      info.textContent = 'Loading dimensions...';
+
+      img.addEventListener('load', () => {
+        info.textContent = img.naturalWidth + ' \u00D7 ' + img.naturalHeight;
+      });
+
+      viewer.appendChild(img);
+      viewer.appendChild(info);
+      container.appendChild(viewer);
+    }
+
+    function renderPdf(container, data) {
+      const viewer = document.createElement('div');
+      viewer.className = 'pdf-viewer';
+
+      const actions = document.createElement('div');
+      actions.className = 'pdf-actions';
+
+      const downloadLink = document.createElement('a');
+      downloadLink.href = data.downloadUrl;
+      downloadLink.download = data.path.split('/').pop();
+      downloadLink.textContent = 'Download PDF';
+      actions.appendChild(downloadLink);
+
+      const openLink = document.createElement('a');
+      openLink.href = data.downloadUrl;
+      openLink.target = '_blank';
+      openLink.rel = 'noopener noreferrer';
+      openLink.textContent = 'Open in new tab';
+      actions.appendChild(openLink);
+      viewer.appendChild(actions);
+
+      // Embed PDF
+      const embed = document.createElement('iframe');
+      embed.className = 'pdf-embed';
+      embed.src = data.downloadUrl;
+      embed.title = data.path.split('/').pop();
+      viewer.appendChild(embed);
+
+      container.appendChild(viewer);
     }
 
     // Hash navigation
@@ -424,7 +721,12 @@
       btnList.classList.toggle('active', viewMode === 'list');
       btnTree.classList.toggle('active', viewMode === 'tree');
 
-      main.innerHTML = '<div class="loading">Loading...</div>';
+      main.textContent = '';
+      const loadingDiv = document.createElement('div');
+      loadingDiv.className = 'loading';
+      loadingDiv.textContent = 'Loading...';
+      main.appendChild(loadingDiv);
+
       const res = await fetch('/api/tree');
       treeData = await res.json();
       handleHash();
