@@ -1,20 +1,20 @@
-# Workspace Viewer
+# .openclaw Viewer
 
-**View your [OpenClaw](https://openclaw.ai) workspace files from your phone.**
+**Browse your [OpenClaw](https://openclaw.ai) `.openclaw` directory from your phone.**
 
-A lightweight, self-hosted markdown viewer built for one problem: OpenClaw agents generate tons of markdown files locally — memory logs, war room blueprints, agent configs, daily notes, project specs — and you need a fast way to browse and read them from any device without pushing anything to the cloud.
+A lightweight, self-hosted file viewer built for one problem: OpenClaw agents generate tons of files locally — memory logs, war room blueprints, agent configs, daily notes, project specs — and you need a fast way to browse and read them from any device without pushing anything to the cloud.
 
 **What's local stays local.** No sync. No cloud storage. No third-party access to your files. Just a tiny Node.js server on your machine, accessed securely over [Tailscale](https://tailscale.com).
 
 ![Node.js](https://img.shields.io/badge/Node.js-18+-green) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 <p align="center">
-  <img src="assets/screenshot-mobile.jpg" alt="Workspace Viewer on mobile" width="320">
+  <img src="assets/screenshot-mobile.jpg" alt=".openclaw Viewer on mobile" width="320">
 </p>
 
 ## Why?
 
-If you run [OpenClaw](https://github.com/openclaw/openclaw) (or any AI agent framework), you end up with a workspace full of `.md` files:
+If you run [OpenClaw](https://github.com/openclaw/openclaw) (or any AI agent framework), you end up with a `.openclaw` directory full of files:
 
 - 🧠 **Memory files** — daily logs, long-term memory, structured learnings
 - ⚔️ **War room outputs** — architecture specs, blueprints, decision logs
@@ -23,7 +23,7 @@ If you run [OpenClaw](https://github.com/openclaw/openclaw) (or any AI agent fra
 
 Opening these one-by-one in a terminal or editor is painful, especially from your phone. Pushing them to GitHub/Notion/cloud defeats the purpose of local-first AI agents.
 
-**Workspace Viewer** gives you a clean, mobile-optimized interface to browse the entire file structure and read any markdown file — all served from your own machine.
+**.openclaw Viewer** gives you a clean, mobile-optimized interface to browse the entire file structure and read any markdown file — all served from your own machine.
 
 ## Features
 
@@ -45,8 +45,8 @@ Opening these one-by-one in a terminal or editor is painful, especially from you
 ## Quick Start
 
 ```bash
-git clone https://github.com/bowen0110/workspace-viewer.git
-cd workspace-viewer
+git clone https://github.com/bowen0110/.openclaw viewer.git
+cd .openclaw viewer
 npm install
 npm start
 ```
@@ -58,8 +58,8 @@ From your phone (via Tailscale): **http://\<your-tailscale-hostname\>:3500**
 ### Custom directory and port
 
 ```bash
-# Serve your OpenClaw workspace
-WORKSPACE_ROOT=~/.openclaw/workspace npm start
+# Serve your .openclaw directory
+WORKSPACE_ROOT=~/.openclaw npm start
 
 # Change port
 PORT=8080 npm start
@@ -85,21 +85,21 @@ You want this always running so you can access it anytime from your phone.
 ```bash
 mkdir -p ~/.config/systemd/user
 
-cat > ~/.config/systemd/user/workspace-viewer.service << EOF
+cat > ~/.config/systemd/user/.openclaw viewer.service << EOF
 [Unit]
-Description=Workspace Viewer
+Description=.openclaw Viewer
 After=network.target
 StartLimitIntervalSec=300
 StartLimitBurst=5
 
 [Service]
 Type=simple
-WorkingDirectory=/path/to/workspace-viewer
+WorkingDirectory=/path/to/.openclaw viewer
 ExecStart=/usr/bin/node server.js
 Restart=on-failure
 RestartSec=10
 Environment=PORT=3500
-Environment=WORKSPACE_ROOT=/path/to/your/workspace
+Environment=WORKSPACE_ROOT=/path/to/.openclaw
 MemoryMax=256M
 TimeoutStartSec=15
 WatchdogSec=120
@@ -110,8 +110,8 @@ EOF
 
 # Enable, start, and persist across logouts
 systemctl --user daemon-reload
-systemctl --user enable workspace-viewer
-systemctl --user start workspace-viewer
+systemctl --user enable .openclaw viewer
+systemctl --user start .openclaw viewer
 loginctl enable-linger $USER
 ```
 
@@ -122,25 +122,25 @@ loginctl enable-linger $USER
 
 ```bash
 # Useful commands
-systemctl --user status workspace-viewer
-systemctl --user restart workspace-viewer
-journalctl --user -u workspace-viewer -f
+systemctl --user status .openclaw viewer
+systemctl --user restart .openclaw viewer
+journalctl --user -u .openclaw viewer -f
 ```
 
 ### macOS (launchd)
 
 ```bash
-cat > ~/Library/LaunchAgents/com.workspace-viewer.plist << EOF
+cat > ~/Library/LaunchAgents/com..openclaw viewer.plist << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.workspace-viewer</string>
+  <string>com..openclaw viewer</string>
   <key>ProgramArguments</key>
   <array>
     <string>/usr/local/bin/node</string>
-    <string>/path/to/workspace-viewer/server.js</string>
+    <string>/path/to/.openclaw viewer/server.js</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
@@ -159,14 +159,14 @@ cat > ~/Library/LaunchAgents/com.workspace-viewer.plist << EOF
   <key>ThrottleInterval</key>
   <integer>10</integer>
   <key>StandardOutPath</key>
-  <string>/tmp/workspace-viewer.log</string>
+  <string>/tmp/.openclaw viewer.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/workspace-viewer.log</string>
+  <string>/tmp/.openclaw viewer.log</string>
 </dict>
 </plist>
 EOF
 
-launchctl load ~/Library/LaunchAgents/com.workspace-viewer.plist
+launchctl load ~/Library/LaunchAgents/com..openclaw viewer.plist
 ```
 
 ### Windows
@@ -174,16 +174,16 @@ launchctl load ~/Library/LaunchAgents/com.workspace-viewer.plist
 **Option A: Task Scheduler**
 
 1. Open `taskschd.msc`
-2. Create Task → Name: "Workspace Viewer"
+2. Create Task → Name: ".openclaw Viewer"
 3. Trigger: "At startup"
-4. Action: Start `node`, arguments `server.js`, start in `C:\path\to\workspace-viewer`
+4. Action: Start `node`, arguments `server.js`, start in `C:\path\to\.openclaw viewer`
 5. Settings: Restart every 1 minute on failure, up to 5 times
 
 **Option B: PM2 (cross-platform)**
 
 ```bash
 npm install -g pm2
-pm2 start server.js --name workspace-viewer
+pm2 start server.js --name .openclaw viewer
 pm2 startup   # auto-start on boot
 pm2 save
 ```
@@ -193,7 +193,7 @@ pm2 save
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
 | `PORT` | `3500` | Server port |
-| `WORKSPACE_ROOT` | Parent directory of `server.js` | Root directory to serve markdown files from |
+| `WORKSPACE_ROOT` | Parent directory of `server.js` | Root directory to serve files from |
 
 ## API
 
@@ -204,9 +204,9 @@ pm2 save
 | `GET /api/file?path=<path>` | Rendered HTML + raw content |
 | `GET /api/search?q=<query>` | Filename search (max 30 results) |
 
-## Works with any markdown workspace
+## Works with any file directory
 
-While built for OpenClaw, this works with any directory of markdown files — Obsidian vaults, documentation repos, note collections, Zettelkasten, etc.
+While built for OpenClaw, this works with any directory of files — Obsidian vaults, documentation repos, note collections, Zettelkasten, etc.
 
 ## Tech Stack
 
