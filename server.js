@@ -249,6 +249,6 @@ app.get('/api/search', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Workspace viewer running at http://0.0.0.0:${PORT}`);
+  console.log(`.openclaw viewer running at http://0.0.0.0:${PORT}`);
   console.log(`Serving files from: ${WORKSPACE_ROOT}`);
 });

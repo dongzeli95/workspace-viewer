@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>Workspace</title>
+  <title>.openclaw</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.4/purify.min.js"></script>
   <style>
@@ -365,7 +365,7 @@
     function renderBreadcrumb(pathParts, isFile) {
       breadcrumbEl.textContent = '';
       const root = document.createElement('a');
-      root.textContent = '\u{1F4C1} workspace';
+      root.textContent = '\u{1F4C1} .openclaw';
       root.addEventListener('click', () => { currentFilePath = null; navigateHome(); });
       breadcrumbEl.appendChild(root);
 
